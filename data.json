@@ -1,0 +1,79 @@
+{
+  "total_equity": 30330,
+  "spot_balance": 10120,
+  "futures_balance": 10210,
+  "reserve_balance": 10000,
+  "spot_pnl": 1.2,
+  "futures_pnl": 2.1,
+  "proposals": [
+    {
+      "asset": "ETH",
+      "type": "Futures",
+      "direction": "Long",
+      "leverage": "5x",
+      "amount": 2000,
+      "tp": "3800",
+      "sl": "3100"
+    },
+    {
+      "asset": "DOGE",
+      "type": "Spot",
+      "direction": "Long",
+      "leverage": "1x",
+      "amount": 1000,
+      "tp": "0.22",
+      "sl": "0.12"
+    },
+    {
+      "asset": "ONDO",
+      "type": "Futures",
+      "direction": "Long",
+      "leverage": "3x",
+      "amount": 1500,
+      "tp": "1.40",
+      "sl": "0.85"
+    }
+  ],
+  "ledger": [
+    {
+      "asset": "BTC",
+      "action": "Buy",
+      "price": "64200",
+      "pnl": 450,
+      "status": "Closed",
+      "timestamp": "2026-07-02",
+      "type": "Spot",
+      "leverage": "1x",
+      "entry": "64200",
+      "exit": "65100",
+      "amount": 1000,
+      "pnl_pct": 1.4,
+      "strategy_id": "SYM-BTC-01"
+    },
+    {
+      "asset": "SOL",
+      "action": "Buy",
+      "price": "145",
+      "pnl": -120,
+      "status": "Closed",
+      "timestamp": "2026-07-03",
+      "type": "Spot",
+      "leverage": "1x",
+      "entry": "145",
+      "exit": "141",
+      "amount": 500,
+      "pnl_pct": -2.4,
+      "strategy_id": "SYM-SOL-01"
+    }
+  ],
+  "whale_watch": [
+    "Net BTC Outflow: ~3,697 BTC ($220M+) removed from exchanges in 24h - Strong Bullish Accumulation",
+    "Sustained Whale accumulation of ONDO in top-tier institutional wallets",
+    "Record ETF inflows for 3 consecutive days indicate strong institutional demand"
+  ],
+  "narratives": [
+    "RWA (Real World Assets) expansion via ONDO",
+    "Agentic AI & DePIN utility growth leading to supply shocks",
+    "Institutional BTC accumulation causing systemic supply constraints"
+  ]
+}
