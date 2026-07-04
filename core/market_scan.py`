@@ -1,0 +1,167 @@
+import requests
+import time
+import pandas as pd
+from datetime import datetime
+import os
+
+# Configuration
+REPO_PATH = r'C:\Users\Shale\symmetry-quant-lab_ash_v2'
+REPORT_PATH = os.path.join(REPO_PATH, 'technical_findings', f'report_{datetime.now().strftime("%Y%m%d")}_TECHNICAL.md')
+SIGNAL_PATH = os.path.join(REPO_PATH, 'intelligence', f'SIGNAL_EXECUTIONER_{datetime.now().strftime("%Y%m%d")}_TECHNICAL.md')
+
+def calculate_wilders_rsi(prices, period=14):
+    if len(prices) < period + 1:
+        return None
+    
+    deltas = pd.Series(prices).diff()
+    gain = deltas.where(deltas > 0, 0)
+    loss = -deltas.where(deltas < 0, 0)
+    
+    # First average is simple mean
+    avg_gain = gain.iloc[1:period+1].mean()
+    avg_loss = loss.iloc[1:period+1].mean()
+    
+    # Subsequent averages use Wilder's smoothing: (PrevAvg * (n-1) + Current) / n
+    for i in range(period + 1, len(prices)):
+        avg_gain = (avg_gain * (period - 1) + gain.iloc[i]) / period
+        avg_loss = (avg_loss * (period - 1) + loss.iloc[i]) / period
+        
+    if avg_loss == 0:
+        return 100 if avg_gain > 0 else 50
+        
+    rs = avg_gain / avg_loss
+    rsi = 100 - (100 / (1 + rs))
+    return rsi
+
+def fetch_top_assets():
+    url = "https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&order=market_cap_desc&per_page=50&page=1&sparkline=false"
+    try:
+        response = requests.get(url, timeout=15)
+        response.raise_for_status()
+        return response.json()
+    except Exception as e:
+        print(f"Error fetching top assets: {e}")
+        return None
+
+def fetch_binance_ticker():
+    url = "https://api.binance.com/api/v3/ticker/24hr"
+    try:
+        response = requests.get(url, timeout=15)
+        response.raise_for_status()
+        return response.json()
+    except Exception as e:
+        print(f"Error fetching Binance tickers: {e}")
+        return None
+
+def fetch_binance_klines(symbol, interval='1d', limit=50):
+    url = f"https://api.binance.com/api/v3/klines?symbol={symbol}&interval={interval}&limit={limit}"
+    try:
+        response = requests.get(url, timeout=15)
+        response.raise_for_status()
+        data = response.json()
+        return [float(k[4]) for k in data] # Closing prices
+    except Exception as e:
+        print(f"Error fetching klines for {symbol}: {e}")
+        return None
+
+def main():
+    print("Starting Deep Market Scan...")
+    top_assets = fetch_top_assets()
+    tickers = fetch_binance_ticker()
+    
+    if not tickers:
+        print("Critical Error: Could not fetch Binance tickers.")
+        return
+    
+    binance_data = {t['symbol']: t for t in tickers}
+    results = []
+    
+    # Default to high-volume USDT pairs if CoinGecko fails
+    target_assets = top_assets if top_assets else []
+    if not target_assets:
+        print("CoinGecko failed, falling back to high-volume Binance pairs.")
+        usdt_pairs = [t for t in tickers if t['symbol'].endswith('USDT')]
+        usdt_pairs.sort(key=lambda x: float(x['quoteVolume']), reverse=True)
+        target_assets = [{"symbol": t['symbol'], "name": t['symbol']} for t in usdt_pairs[:50]]
+
+    for asset in target_assets:
+        symbol = asset['symbol'].upper() if 'USDT' in asset['symbol'] else asset['symbol'].upper() + 'USDT'
+        ticker = binance_data.get(symbol)
+        if not ticker:
+            continue
+            
+        prices = fetch_binance_klines(symbol)
+        if not prices:
+            continue
+            
+        rsi = calculate_wilders_rsi(prices)
+        
+        results.append({
+            'symbol': symbol,
+            'name': asset.get('name', symbol),
+            'price': float(ticker['lastPrice']),
+            'change': float(ticker['priceChangePercent']),
+            'volume': float(ticker['quoteVolume']),
+            'rsi': rsi
+        })
+        time.sleep(0.1) # Polite rate limit
+
+    # Analysis for Anomalies
+    anomalies = []
+    for r in results:
+        note = []
+        if r['rsi'] and r['rsi'] < 30: note.append("Oversold (Bullish Rebound)")
+        if r['rsi'] and r['rsi'] > 70: note.append("Overbought (Correction Risk)")
+        if r['change'] > 5 and r['volume'] > 1e9: note.append("High-Vol Breakout")
+        
+        if note:
+            r['note'] = ", ".join(note)
+            anomalies.append(r)
+        else:
+            r['note'] = "Neutral"
+
+    # Write Report
+    os.makedirs(os.path.dirname(REPORT_PATH), exist_ok=True)
+    with open(REPORT_PATH, 'w', encoding='utf-8') as f:
+        f.write(f"# Technical Analysis Market Report - {datetime.now().strftime('%Y-%m-%d %H:%M')}\n\n")
+        f.write("## 📊 Market Snapshot (Top 50 Assets)\n\n")
+        f.write("| Asset | Price | 24h Change | Volume (USDT) | RSI (14) | Note |\n")
+        f.write("|---|---|---|---|---|---|\n")
+        for r in results:
+            rsi_val = f"{r['rsi']:.2f}" if r['rsi'] is not None else "N/A"
+            f.write(f"| {r['name']} | {r['price']:.4f} | {r['change']:.2f}% | {r['volume']:,.0f} | {rsi_val} | {r['note']} |\n")
+        
+        if anomalies:
+            f.write("\n\n## ⚠️ Identified Anomalies & Breakouts\n\n")
+            for a in anomalies:
+                f.write(f"- **{a['name']}**: {a['note']} (Price: {a['price']:.4f}, RSI: {a['rsi']:.2f}, Change: {a['change']:.2f}%)\n")
+
+    # Narrative Alignment & Signaling
+    # Narratives: AI-Agentic Economy / Sovereign Compute
+    ai_assets = {'NEAR', 'RNDR', 'FET', 'TAO', 'AGIX', 'OCEAN', 'SUI'} 
+    signal_triggered = False
+    signal_text = ""
+    
+    for r in results:
+        sym_base = r['symbol'].replace('USDT', '')
+        if sym_base in ai_assets:
+            if r['change'] > 2 or (r['rsi'] and r['rsi'] < 35):
+                signal_triggered = True
+                signal_text += f"- **{sym_base}**: {r['note']} | Price: {r['price']:.4f}, RSI: {r['rsi']:.2f}. Aligns with AI-Agentic Economy / Sovereign Compute narrative.\n"
+
+    if signal_triggered:
+        os.makedirs(os.path.dirname(SIGNAL_PATH), exist_ok=True)
+        with open(SIGNAL_PATH, 'w', encoding='utf-8') as f:
+            f.write(f"# SIGNAL: POSITIVE (Technical Alignment)\n\n")
+            f.write(f"**Timestamp**: {datetime.now().strftime('%Y-%m-%d %H:%M')}\n")
+            f.write(f"**Narrative**: AI-Agentic Economy / Sovereign Compute / Institutional Adoption\n\n")
+            f.write(f"## Technical Triggers:\n{signal_text}\n\n")
+            f.write("## Recommendation:\nMaintain bullish bias on AI sector. Seek entries on RSI dips or confirm volume-backed breakouts.")
+        print("Executioner signal emitted.")
+    else:
+        print("No narrative-aligned technical signals found.")
+
+    print(f"Scan complete. Report written to {REPORT_PATH}")
+
+if __name__ == '__main__':
+    main()
